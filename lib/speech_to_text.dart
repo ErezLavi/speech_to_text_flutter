@@ -60,6 +60,9 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
       setState(() {
         _ready = ready;
         _localeId = _resolveLocale(locale?.localeId);
+        if (_localeId.isEmpty) {
+          _localeId = _resolveLocale(_browserLocaleId());
+        }
         if (!ready) {
           _error = kIsWeb
               ? 'Web speech is unavailable. Use Chrome/Edge, allow microphone, and run from localhost or HTTPS.'
@@ -85,15 +88,38 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   String _resolveLocale(String? candidate) {
-    if (candidate == null || candidate.isEmpty || _localeNames.isEmpty) {
+    final normalizedCandidate = _normalizeLocaleId(candidate);
+    if (normalizedCandidate.isEmpty || _localeNames.isEmpty) {
       return '';
     }
+
     for (final locale in _localeNames) {
-      if (locale.localeId == candidate) {
-        return candidate;
+      if (_normalizeLocaleId(locale.localeId) == normalizedCandidate) {
+        return locale.localeId;
+      }
+    }
+
+    final candidateLanguage = normalizedCandidate.split('-').first;
+    for (final locale in _localeNames) {
+      if (_normalizeLocaleId(locale.localeId).split('-').first ==
+          candidateLanguage) {
+        return locale.localeId;
       }
     }
     return '';
+  }
+
+  String _normalizeLocaleId(String? localeId) {
+    if (localeId == null) return '';
+    return localeId.trim().replaceAll('_', '-').toLowerCase();
+  }
+
+  String _browserLocaleId() {
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final language = locale.languageCode.trim().toLowerCase();
+    final country = locale.countryCode?.trim().toUpperCase() ?? '';
+    if (language.isEmpty) return '';
+    return country.isEmpty ? language : '$language-$country';
   }
 
   Future<void> _start() async {
@@ -111,6 +137,9 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     });
 
     try {
+      if (_localeId.isEmpty) {
+        _localeId = _resolveLocale(_browserLocaleId());
+      }
       await _speech.cancel();
       await _speech.listen(
         onResult: _onResult,
@@ -263,6 +292,10 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                                     height: 1.32,
                                     fontWeight: FontWeight.w500,
                                   ),
+                                  textDirection: _isRtlLocale()
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
+                                  textAlign: TextAlign.start,
                                 ),
                               ),
                             ),
@@ -362,15 +395,20 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   String _currentLanguageLabel() {
-    if (_localeId.isEmpty) {
-      return 'English';
+    final localeId =
+        _localeId.isEmpty ? _resolveLocale(_browserLocaleId()) : _localeId;
+
+    if (localeId.isEmpty) {
+      final browserLocaleId = _browserLocaleId();
+      return browserLocaleId.isEmpty ? 'Unknown' : browserLocaleId;
     }
+
     for (final locale in _localeNames) {
-      if (locale.localeId == _localeId) {
+      if (locale.localeId == localeId) {
         return locale.name;
       }
     }
-    return _localeId;
+    return localeId;
   }
 
   String _buildDisplayWords() {
@@ -408,8 +446,18 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
 
   String _normalizeText(String input) {
     final lower = input.toLowerCase();
-    final cleaned = lower.replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
+    final cleaned = lower.replaceAll(
+      RegExp(r'[^\p{L}\p{N}\s]', unicode: true),
+      ' ',
+    );
     return cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  bool _isRtlLocale() {
+    final localeId = _localeId.isEmpty ? _browserLocaleId() : _localeId;
+    final languageCode = _normalizeLocaleId(localeId).split('-').first;
+    const rtlLanguages = {'ar', 'fa', 'he', 'iw', 'ps', 'sd', 'ug', 'ur', 'yi'};
+    return rtlLanguages.contains(languageCode);
   }
 
   void _clearTranscript() {
