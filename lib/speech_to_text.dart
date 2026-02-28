@@ -15,6 +15,7 @@ class SpeechSampleApp extends StatefulWidget {
 class _SpeechSampleAppState extends State<SpeechSampleApp> {
   final SpeechToText _speech = SpeechToText();
   static const String _placeholderText = 'Press "Start" and speak';
+  static const String _forcedLocaleId = 'en-US';
 
   bool _ready = false;
   bool _initializing = false;
@@ -55,18 +56,19 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
       if (ready) {
         _localeNames = await _speech.locales();
       }
-      final locale = ready ? await _speech.systemLocale() : null;
       if (!mounted) return false;
       setState(() {
         _ready = ready;
-        _localeId = _resolveLocale(locale?.localeId);
+        _localeId = _resolveLocale(_forcedLocaleId);
         if (_localeId.isEmpty) {
-          _localeId = _resolveLocale(_browserLocaleId());
+          _localeId = _resolveLocale('en');
         }
         if (!ready) {
           _error = kIsWeb
               ? 'Web speech is unavailable. Use Chrome/Edge, allow microphone, and run from localhost or HTTPS.'
               : 'Speech recognition is unavailable on this device.';
+        } else if (_localeId.isEmpty) {
+          _error = 'English speech recognition is not available in this browser.';
         }
       });
       return ready;
@@ -114,14 +116,6 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     return localeId.trim().replaceAll('_', '-').toLowerCase();
   }
 
-  String _browserLocaleId() {
-    final locale = WidgetsBinding.instance.platformDispatcher.locale;
-    final language = locale.languageCode.trim().toLowerCase();
-    final country = locale.countryCode?.trim().toUpperCase() ?? '';
-    if (language.isEmpty) return '';
-    return country.isEmpty ? language : '$language-$country';
-  }
-
   Future<void> _start() async {
     if (_starting || _initializing) return;
     _starting = true;
@@ -138,7 +132,10 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
 
     try {
       if (_localeId.isEmpty) {
-        _localeId = _resolveLocale(_browserLocaleId());
+        _localeId = _resolveLocale(_forcedLocaleId);
+      }
+      if (_localeId.isEmpty) {
+        _localeId = _resolveLocale('en');
       }
       await _speech.cancel();
       await _speech.listen(
@@ -260,7 +257,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                             children: [
                               _pill('Ready', _ready ? 'Yes' : 'No'),
                               _pill('Status', _status),
-                              _pill('Language', _currentLanguageLabel()),
+                              _pill('Language', 'English (en-US)'),
                               if (_status == 'done' &&
                                   _committedWords.trim().isNotEmpty)
                                 Padding(
@@ -394,23 +391,6 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     );
   }
 
-  String _currentLanguageLabel() {
-    final localeId =
-        _localeId.isEmpty ? _resolveLocale(_browserLocaleId()) : _localeId;
-
-    if (localeId.isEmpty) {
-      final browserLocaleId = _browserLocaleId();
-      return browserLocaleId.isEmpty ? 'Unknown' : browserLocaleId;
-    }
-
-    for (final locale in _localeNames) {
-      if (locale.localeId == localeId) {
-        return locale.name;
-      }
-    }
-    return localeId;
-  }
-
   String _buildDisplayWords() {
     final committed = _committedWords.trim();
     final live = _sessionWords.trim();
@@ -454,7 +434,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   bool _isRtlLocale() {
-    final localeId = _localeId.isEmpty ? _browserLocaleId() : _localeId;
+    final localeId = _localeId.isEmpty ? _forcedLocaleId : _localeId;
     final languageCode = _normalizeLocaleId(localeId).split('-').first;
     const rtlLanguages = {'ar', 'fa', 'he', 'iw', 'ps', 'sd', 'ug', 'ur', 'yi'};
     return rtlLanguages.contains(languageCode);
