@@ -14,7 +14,7 @@ class SpeechSampleApp extends StatefulWidget {
 
 class _SpeechSampleAppState extends State<SpeechSampleApp> {
   final SpeechToText _speech = SpeechToText();
-  static const String _placeholderText = 'Press "Enable & Start" and speak';
+  static const String _placeholderText = 'Press "Start" and speak';
 
   bool _ready = false;
   bool _initializing = false;
@@ -217,7 +217,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Speech To Text',
+                            'Speech To Text Demo',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
@@ -231,12 +231,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                             children: [
                               _pill('Ready', _ready ? 'Yes' : 'No'),
                               _pill('Status', _status),
-                              _pill(
-                                'Locale',
-                                _localeId.isEmpty
-                                    ? 'system default'
-                                    : _localeId,
-                              ),
+                              _pill('Language', _currentLanguageLabel()),
                               if (_status == 'done' &&
                                   _committedWords.trim().isNotEmpty)
                                 Padding(
@@ -364,6 +359,18 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         ),
       ),
     );
+  }
+
+  String _currentLanguageLabel() {
+    if (_localeId.isEmpty) {
+      return 'English';
+    }
+    for (final locale in _localeNames) {
+      if (locale.localeId == _localeId) {
+        return locale.name;
+      }
+    }
+    return _localeId;
   }
 
   String _buildDisplayWords() {
